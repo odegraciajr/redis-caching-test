@@ -1,0 +1,29 @@
+{
+  "name": "redis-caching-test",
+  "version": "1.0.0",
+  "description": "Simple redis caching test",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node --harmony index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/odegraciajr/redis-caching-test.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/odegraciajr/redis-caching-test/issues"
+  },
+  "homepage": "https://github.com/odegraciajr/redis-caching-test#readme",
+  "dependencies": {
+    "bluebird": "^3.5.1",
+    "cli-table2": "^0.2.0",
+    "colors": "^1.2.1",
+    "lodash": "^4.17.5",
+    "redis-client": "git+ssh://git@github.com/firstperformancecorporation/redis-client.git",
+    "request": "^2.85.0",
+    "request-promise": "^4.2.2"
+  }
+}
