@@ -4,8 +4,8 @@ const TWEED_BASE_URL = 'http://localhost:4435';
 const REDIS_HOST = 'localhost';
 const REDIS_PORT = '6379';
 const REDIS_PASS = 'lB9LDTRbM7T6p*b!';
-const CARDNUM_START = 8888882000000000;
-const CARDNUM_LIMIT = 1; // number of cards to add
+const CARDNUM_START = 8888881000000000;
+const CARDNUM_LIMIT = 100; // number of cards to add
 
 const RedisClient = require('redis-client');
 const Promise = require('bluebird');
@@ -14,6 +14,7 @@ const colors = require('colors/safe');
 const Table = require('cli-table2');
 
 const table = new Table();
+const table2 = new Table();
 let cardsAdded = 0;
 let errorCount = 0;
 let mismatchCount = 0;
@@ -23,6 +24,13 @@ const redis = new RedisClient({
   port: REDIS_PORT,
   password: REDIS_PASS
 });
+
+function bytesToSize(bytes) {
+  var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  if (bytes == 0) return '0 Byte';
+  var i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+  return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+}
 
 function cardCount() {
   return new Promise((resolve, reject) => {
@@ -108,16 +116,30 @@ async function redisTest(arr) {
     await myDelay(e);
   }), Promise.resolve());
 
-  // Done
+  const redisInfo = redis.client.server_info;
+  console.log(colors.blue('Redis Server Info'));
+
   table.push(
+    [colors.green('OS'), redisInfo.os],
+    [colors.green('Max Memory'), bytesToSize(redisInfo.maxmemory)],
+    [colors.green('Max Memory Policy'), redisInfo.maxmemory_policy],
+    [colors.green('Expired Keys'), redisInfo.expired_keys],
+    [colors.green('Evicted Keys'), redisInfo.evicted_keys]
+  );
+  console.log(table.toString());
+
+  console.log(colors.blue('Test Results'));
+  table2.push(
     [colors.green('Number of cards'), CARDNUM_LIMIT],
     [colors.green('Cards added'), cardsAdded],
     [colors.green('Redis mismatch'), colors.red(mismatchCount)],
     [colors.green('Total error count'), colors.red(errorCount)]
   );
 
-  console.log(table.toString());
+  console.log(table2.toString());
+  // console.log(redis.client.server_info);
 }
 
 const cards = generateCards(CARDNUM_START, CARDNUM_LIMIT);
 redisTest(cards);
+// redisTest([8888882310000006]);
