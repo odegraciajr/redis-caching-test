@@ -26,10 +26,10 @@ const redis = new RedisClient({
 });
 
 function bytesToSize(bytes) {
-  var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  if (bytes == 0) return '0 Byte';
-  var i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-  return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  if (bytes === 0) return '0 Byte';
+  const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+  return `${Math.round(bytes / (1024 ** i), 2)} ${sizes[i]}`;
 }
 
 function cardCount() {
@@ -70,7 +70,8 @@ const makeRequest = async (cardNum) => {
 
     if (res.status === 'SUCCESS') {
       console.log('Card Added! ', colors.green(`${cardNum}|${res.hash}`));
-      // check again the card count, it should greater than the cCount since we added a new card
+      // check again the card count, it should greater than the cCount
+      // since we added a new card
       const updatedCount = await cardCount();
 
       // compare the old card count before addCard if cCount is greater or equal
@@ -104,6 +105,8 @@ function generateCards(start, limit) {
   return cards;
 }
 
+const testCards = generateCards(CARDNUM_START, CARDNUM_LIMIT);
+
 function myDelay(x) {
   return new Promise(r => setTimeout(
     () => r(makeRequest(x)),
@@ -112,7 +115,7 @@ function myDelay(x) {
 }
 
 async function redisTest(arr) {
-  await arr.reduce((p, e, i) => p.then(async () => {
+  await arr.reduce((p, e) => p.then(async () => {
     await myDelay(e);
   }), Promise.resolve());
 
@@ -137,9 +140,7 @@ async function redisTest(arr) {
   );
 
   console.log(table2.toString());
-  // console.log(redis.client.server_info);
 }
 
-const cards = generateCards(CARDNUM_START, CARDNUM_LIMIT);
-redisTest(cards);
-// redisTest([8888882310000006]);
+// Run test
+redisTest(testCards);
