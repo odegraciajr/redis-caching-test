@@ -4,8 +4,8 @@ const TWEED_BASE_URL = 'http://localhost:4435';
 const REDIS_HOST = 'localhost';
 const REDIS_PORT = '6379';
 const REDIS_PASS = 'lB9LDTRbM7T6p*b!';
-const CARDNUM_START = 8888881000000000;
-const CARDNUM_LIMIT = 100; // number of cards to add
+const CARDNUM_START = 8888882000000000;
+const CARDNUM_LIMIT = 1000; // number of cards to add
 
 const RedisClient = require('redis-client');
 const Promise = require('bluebird');
@@ -18,13 +18,15 @@ const table2 = new Table();
 let cardsAdded = 0;
 let errorCount = 0;
 let mismatchCount = 0;
+const cardHashes = [];
+let cacheMissed = 0;
 
 const redis = new RedisClient({
   host: REDIS_HOST,
   port: REDIS_PORT,
-  password: REDIS_PASS
+  password: REDIS_PASS,
 });
-
+/* eslint-disable no-console */
 function bytesToSize(bytes) {
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   if (bytes === 0) return '0 Byte';
@@ -49,12 +51,12 @@ async function addCardSecure(number) {
     method: 'POST',
     uri: `${TWEED_BASE_URL}/api/v1/card/addCardSecure`,
     headers: {
-      'x-auth-token': '&nsrBrNHWCSk$8#4'
+      'x-auth-token': '&nsrBrNHWCSk$8#4',
     },
     json: true,
     body: {
-      number
-    }
+      number,
+    },
   };
 
   return rp(options);
@@ -69,6 +71,7 @@ const makeRequest = async (cardNum) => {
     const res = await addCardSecure(cardNum);
 
     if (res.status === 'SUCCESS') {
+      cardHashes.push(`db:card:${res.hash}`);
       console.log('Card Added! ', colors.green(`${cardNum}|${res.hash}`));
       // check again the card count, it should greater than the cCount
       // since we added a new card
@@ -95,6 +98,19 @@ const makeRequest = async (cardNum) => {
   }
 };
 
+const searchCache = async (cacheKey) => {
+  try {
+    const cardSettings = await redis.hgetall(cacheKey);
+    console.log('cardSettings.number', cardSettings.number);
+
+    if (!cardSettings) {
+      cacheMissed += 1;
+    }
+  } catch (err) {
+    cacheMissed += 1;
+  }
+};
+
 function generateCards(start, limit) {
   const cards = [];
 
@@ -108,15 +124,22 @@ function generateCards(start, limit) {
 const testCards = generateCards(CARDNUM_START, CARDNUM_LIMIT);
 
 function myDelay(x) {
-  return new Promise(r => setTimeout(
-    () => r(makeRequest(x)),
+  return new Promise(resolve => setTimeout(
+    () => resolve(makeRequest(x)),
     DELAY_PER_REQUEST
   ));
 }
 
-async function redisTest(arr) {
+function cacheDelay(key) {
+  return new Promise(resolve => setTimeout(
+    () => resolve(searchCache(key)),
+    200
+  ));
+}
+
+async function cacheTest(arr) {
   await arr.reduce((p, e) => p.then(async () => {
-    await myDelay(e);
+    await cacheDelay(e);
   }), Promise.resolve());
 
   const redisInfo = redis.client.server_info;
@@ -127,7 +150,8 @@ async function redisTest(arr) {
     [colors.green('Max Memory'), bytesToSize(redisInfo.maxmemory)],
     [colors.green('Max Memory Policy'), redisInfo.maxmemory_policy],
     [colors.green('Expired Keys'), redisInfo.expired_keys],
-    [colors.green('Evicted Keys'), redisInfo.evicted_keys]
+    [colors.green('Evicted Keys'), redisInfo.evicted_keys],
+    [colors.green('Cache Missed'), cacheMissed]
   );
   console.log(table.toString());
 
@@ -140,6 +164,16 @@ async function redisTest(arr) {
   );
 
   console.log(table2.toString());
+  // console.log('redisInfo', redisInfo);
+  // console.log('cardHashes', cardHashes);
+}
+
+async function redisTest(arr) {
+  await arr.reduce((p, e) => p.then(async () => {
+    await myDelay(e);
+  }), Promise.resolve());
+
+  cacheTest(cardHashes);
 }
 
 // Run test
