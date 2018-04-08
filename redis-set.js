@@ -1,15 +1,13 @@
 // settings
-const DELAY_PER_REQUEST = 1000; // millisecond
-const TWEED_BASE_URL = 'http://localhost:4435';
+const DELAY_PER_REQUEST = 100; // millisecond
 const REDIS_HOST = 'localhost';
 const REDIS_PORT = '6379';
 const REDIS_PASS = 'lB9LDTRbM7T6p*b!';
-const CARDNUM_START = 8888885000000200;
-const CARDNUM_LIMIT = 1000; // number of cards to add
+const CARDNUM_START = 9888880000000000;
+const CARDNUM_LIMIT = 10; // number of cards to add
 
 const RedisClient = require('redis-client');
 const Promise = require('bluebird');
-const rp = require('request-promise');
 const colors = require('colors/safe');
 const Table = require('cli-table2');
 
@@ -24,7 +22,7 @@ let cacheMissed = 0;
 const redis = new RedisClient({
   host: REDIS_HOST,
   port: REDIS_PORT,
-  password: REDIS_PASS,
+  password: REDIS_PASS
 });
 /* eslint-disable no-console */
 function bytesToSize(bytes) {
@@ -36,80 +34,27 @@ function bytesToSize(bytes) {
 
 function cardCount() {
   return new Promise((resolve, reject) => {
-    redis.client.keys('db:card:*', (e, obj) => {
+    redis.client.get('card::*', (e, obj) => {
       if (e !== null) {
         reject(e);
       }
 
-      resolve(obj.length);
+      resolve(obj && obj.length);
     });
   });
 }
 
 async function addCardSecure(number) {
-  const options = {
-    method: 'POST',
-    uri: `${TWEED_BASE_URL}/api/v1/card/addCardSecure`,
-    headers: {
-      'x-auth-token': '&nsrBrNHWCSk$8#4',
-    },
-    json: true,
-    body: {
-      number,
-    },
-  };
-
-  return rp(options);
-}
-
-const makeRequest = async (cardNum) => {
-  try {
-    const cCount = await cardCount();
-    console.log(`${cCount}-${cardNum}`);
-
-    // Add a new card
-    const res = await addCardSecure(cardNum);
-
-    if (res.status === 'SUCCESS') {
-      cardHashes.push(`db:card:${res.hash}`);
-      console.log('Card Added! ', colors.green(`${cardNum}|${res.hash}`));
-      // check again the card count, it should greater than the cCount
-      // since we added a new card
-      const updatedCount = await cardCount();
-
-      // compare the old card count before addCard if cCount is greater or equal
-      // it means that the cache had a mismatch
-      if (cCount >= updatedCount) {
-        console.log(colors.red('cCount is >= updatedCount!'));
-        errorCount += 1;
-        mismatchCount += 1;
+  return new Promise((resolve, reject) => {
+    redis.client.set(`card:${number}`, number.toString(16), 'EX', 100, (err) => {
+      if (err) {
+        reject(err);
       } else {
-        console.log('Prev Card Count: ', cCount);
-        console.log('Updated Card Count: ', updatedCount);
-        cardsAdded += 1;
+        resolve(number);
       }
-    } else {
-      console.log('AddCard Error!');
-      errorCount += 1;
-    }
-  } catch (err) { // mainly promise errors or addCard errors
-    console.log(colors.red(err.message));
-    errorCount += 1;
-  }
-};
-
-const searchCache = async (cacheKey) => {
-  try {
-    const cardSettings = await redis.hgetall(cacheKey);
-    console.log('cardSettings.number', cardSettings.number);
-
-    if (!cardSettings) {
-      cacheMissed += 1;
-    }
-  } catch (err) {
-    cacheMissed += 1;
-  }
-};
+    });
+  });
+}
 
 function generateCards(start, limit) {
   const cards = [];
@@ -123,17 +68,24 @@ function generateCards(start, limit) {
 
 const testCards = generateCards(CARDNUM_START, CARDNUM_LIMIT);
 
-function myDelay(x) {
-  return new Promise(resolve => setTimeout(
-    () => resolve(makeRequest(x)),
-    DELAY_PER_REQUEST,
-  ));
-}
+const searchCache = async (cacheKey) => {
+  return new Promise((resolve, reject) => {
+    redis.client.get(`${cacheKey}`, (err, res) => {
+      if (err || !res) {
+        cacheMissed += 1;
+        reject(err);
+      } else {
+        console.log(`${cacheKey} is ${res}`);
+        resolve(res);
+      }
+    });
+  });
+};
 
 function cacheDelay(key) {
   return new Promise(resolve => setTimeout(
     () => resolve(searchCache(key)),
-    200,
+    DELAY_PER_REQUEST - 50
   ));
 }
 
@@ -151,7 +103,7 @@ async function cacheTest(arr) {
     [colors.green('Max Memory Policy'), redisInfo.maxmemory_policy],
     [colors.green('Expired Keys'), redisInfo.expired_keys],
     [colors.green('Evicted Keys'), redisInfo.evicted_keys],
-    [colors.green('Cache Missed'), cacheMissed],
+    [colors.green('Cache Missed'), cacheMissed]
   );
   console.log(table.toString());
 
@@ -160,12 +112,36 @@ async function cacheTest(arr) {
     [colors.green('Number of cards'), CARDNUM_LIMIT],
     [colors.green('Cards added'), cardsAdded],
     [colors.green('Redis mismatch'), colors.red(mismatchCount)],
-    [colors.green('Total error count'), colors.red(errorCount)],
+    [colors.green('Total error count'), colors.red(errorCount)]
   );
 
   console.log(table2.toString());
-  // console.log('redisInfo', redisInfo);
-  // console.log('cardHashes', cardHashes);
+}
+
+const makeRequest = async (cardNum) => {
+  try {
+
+    // Add a new card
+    const res = await addCardSecure(cardNum);
+
+    if (res) {
+      cardHashes.push(`card:${res}`);
+      console.log('Card Added! ', colors.green(`${cardNum}|${res}`));
+    } else {
+      console.log('AddCard Error!');
+      errorCount += 1;
+    }
+  } catch (err) { // mainly promise errors or addCard errors
+    console.log(colors.red(err.message));
+    errorCount += 1;
+  }
+};
+
+function myDelay(x) {
+  return new Promise(resolve => setTimeout(
+    () => resolve(makeRequest(x)),
+    DELAY_PER_REQUEST
+  ));
 }
 
 async function redisTest(arr) {
@@ -173,6 +149,7 @@ async function redisTest(arr) {
     await myDelay(e);
   }), Promise.resolve());
 
+  console.log(colors.green('Done adding cards'));
   cacheTest(cardHashes);
 }
 
