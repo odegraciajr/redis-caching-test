@@ -13,16 +13,16 @@ const Table = require('cli-table2');
 
 const table = new Table();
 const table2 = new Table();
-let cardsAdded = 0;
+const cardsAdded = 0;
 let errorCount = 0;
-let mismatchCount = 0;
+const mismatchCount = 0;
 const cardHashes = [];
 let cacheMissed = 0;
 
 const redis = new RedisClient({
   host: REDIS_HOST,
   port: REDIS_PORT,
-  password: REDIS_PASS
+  password: REDIS_PASS,
 });
 /* eslint-disable no-console */
 function bytesToSize(bytes) {
@@ -68,24 +68,22 @@ function generateCards(start, limit) {
 
 const testCards = generateCards(CARDNUM_START, CARDNUM_LIMIT);
 
-const searchCache = async (cacheKey) => {
-  return new Promise((resolve, reject) => {
-    redis.client.get(`${cacheKey}`, (err, res) => {
-      if (err || !res) {
-        cacheMissed += 1;
-        reject(err);
-      } else {
-        console.log(`${cacheKey} is ${res}`);
-        resolve(res);
-      }
-    });
+const searchCache = async cacheKey => new Promise((resolve, reject) => {
+  redis.client.get(`${cacheKey}`, (err, res) => {
+    if (err || !res) {
+      cacheMissed += 1;
+      reject(err);
+    } else {
+      console.log(`${cacheKey} is ${res}`);
+      resolve(res);
+    }
   });
-};
+});
 
 function cacheDelay(key) {
   return new Promise(resolve => setTimeout(
     () => resolve(searchCache(key)),
-    DELAY_PER_REQUEST - 50
+    DELAY_PER_REQUEST - 50,
   ));
 }
 
@@ -103,7 +101,7 @@ async function cacheTest(arr) {
     [colors.green('Max Memory Policy'), redisInfo.maxmemory_policy],
     [colors.green('Expired Keys'), redisInfo.expired_keys],
     [colors.green('Evicted Keys'), redisInfo.evicted_keys],
-    [colors.green('Cache Missed'), cacheMissed]
+    [colors.green('Cache Missed'), cacheMissed],
   );
   console.log(table.toString());
 
@@ -112,7 +110,7 @@ async function cacheTest(arr) {
     [colors.green('Number of cards'), CARDNUM_LIMIT],
     [colors.green('Cards added'), cardsAdded],
     [colors.green('Redis mismatch'), colors.red(mismatchCount)],
-    [colors.green('Total error count'), colors.red(errorCount)]
+    [colors.green('Total error count'), colors.red(errorCount)],
   );
 
   console.log(table2.toString());
@@ -120,7 +118,6 @@ async function cacheTest(arr) {
 
 const makeRequest = async (cardNum) => {
   try {
-
     // Add a new card
     const res = await addCardSecure(cardNum);
 
@@ -140,7 +137,7 @@ const makeRequest = async (cardNum) => {
 function myDelay(x) {
   return new Promise(resolve => setTimeout(
     () => resolve(makeRequest(x)),
-    DELAY_PER_REQUEST
+    DELAY_PER_REQUEST,
   ));
 }
 

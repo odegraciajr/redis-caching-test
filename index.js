@@ -4,8 +4,9 @@ const TWEED_BASE_URL = 'http://localhost:4435';
 const REDIS_HOST = 'localhost';
 const REDIS_PORT = '6379';
 const REDIS_PASS = 'lB9LDTRbM7T6p*b!';
-const CARDNUM_START = 8888885000000200;
-const CARDNUM_LIMIT = 1000; // number of cards to add
+// const CARDNUM_START = 8888885000000200;
+const CARDNUM_START = 8888881000000000;
+const CARDNUM_LIMIT = 20; // number of cards to add
 
 const RedisClient = require('redis-client');
 const Promise = require('bluebird');
@@ -97,11 +98,12 @@ const makeRequest = async (cardNum) => {
     errorCount += 1;
   }
 };
+let tm = 0;
 
 const searchCache = async (cacheKey) => {
   try {
     const cardSettings = await redis.hgetall(cacheKey);
-    console.log('cardSettings.number', cardSettings.number);
+    console.log(`${tm += 1}| HGETALL '${cacheKey}' |`, cardSettings.settings.toString().length);
 
     if (!cardSettings) {
       cacheMissed += 1;
@@ -125,15 +127,13 @@ const testCards = generateCards(CARDNUM_START, CARDNUM_LIMIT);
 
 function myDelay(x) {
   return new Promise(resolve => setTimeout(
-    () => resolve(makeRequest(x)),
-    DELAY_PER_REQUEST,
+    () => resolve(makeRequest(x)), DELAY_PER_REQUEST
   ));
 }
 
 function cacheDelay(key) {
   return new Promise(resolve => setTimeout(
-    () => resolve(searchCache(key)),
-    200,
+    () => resolve(searchCache(key)), 200
   ));
 }
 
@@ -151,7 +151,7 @@ async function cacheTest(arr) {
     [colors.green('Max Memory Policy'), redisInfo.maxmemory_policy],
     [colors.green('Expired Keys'), redisInfo.expired_keys],
     [colors.green('Evicted Keys'), redisInfo.evicted_keys],
-    [colors.green('Cache Missed'), cacheMissed],
+    [colors.green('Cache Missed'), cacheMissed]
   );
   console.log(table.toString());
 
@@ -160,7 +160,7 @@ async function cacheTest(arr) {
     [colors.green('Number of cards'), CARDNUM_LIMIT],
     [colors.green('Cards added'), cardsAdded],
     [colors.green('Redis mismatch'), colors.red(mismatchCount)],
-    [colors.green('Total error count'), colors.red(errorCount)],
+    [colors.green('Total error count'), colors.red(errorCount)]
   );
 
   console.log(table2.toString());
